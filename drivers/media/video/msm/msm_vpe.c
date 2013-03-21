@@ -86,6 +86,15 @@ static int vpe_reset(void)
 {
 	uint32_t vpe_version;
 	uint32_t rc = 0;
+	unsigned long flags = 0;
+
+	spin_lock_irqsave(&vpe_ctrl->lock, flags);
+	if (vpe_ctrl->state == VPE_STATE_IDLE) {
+		CDBG("%s: VPE already disabled.", __func__);
+		spin_unlock_irqrestore(&vpe_ctrl->lock, flags);
+		return rc;
+	}
+	spin_unlock_irqrestore(&vpe_ctrl->lock, flags);
 
 	vpe_reset_state_variables();
 	vpe_version = msm_io_r(vpe_ctrl->vpebase + VPE_HW_VERSION_OFFSET);
@@ -668,6 +677,7 @@ static int msm_vpe_resource_init(struct platform_device *pdev)
 /* from this part it is error handling. */
 vpe_unmap_mem_region:
 	iounmap(vpe_ctrl->vpebase);
+	vpe_ctrl->vpebase = NULL;
 	return rc;  /* this rc should have error code. */
 }
 
@@ -678,8 +688,12 @@ void msm_vpe_subdev_release(struct platform_device *pdev)
 		pr_err("%s: no VPE object to release", __func__);
 		return;
 	}
-
-	iounmap(vpe_ctrl->vpebase);
+	if (vpe_ctrl->vpebase != NULL) {
+		vpe_reset();
+		iounmap(vpe_ctrl->vpebase);
+		vpe_ctrl->vpebase = NULL;
+	}
+	vpe_disable();
 	atomic_set(&vpe_init_done, 0);
 }
 EXPORT_SYMBOL(msm_vpe_subdev_release);

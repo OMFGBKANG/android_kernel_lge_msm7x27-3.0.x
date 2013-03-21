@@ -201,7 +201,7 @@ static unsigned long audio_aio_ion_fixup(struct q6audio_aio *audio, void *addr,
 
 static int audio_aio_pause(struct q6audio_aio  *audio)
 {
-	int rc = 0;
+	int rc = -EINVAL;
 
 	pr_debug("%s[%p], enabled = %d\n", __func__, audio,
 			audio->enabled);
@@ -946,8 +946,15 @@ static void audio_aio_async_write(struct q6audio_aio *audio,
 
 	ac = audio->ac;
 	/* Offset with  appropriate meta */
-	param.paddr = buf_node->paddr + sizeof(struct dec_meta_in);
-	param.len = buf_node->buf.data_len - sizeof(struct dec_meta_in);
+	if (audio->feedback) {
+		/* Non Tunnel mode */
+		param.paddr = buf_node->paddr + sizeof(struct dec_meta_in);
+		param.len = buf_node->buf.data_len - sizeof(struct dec_meta_in);
+	} else {
+		/* Tunnel mode */
+		param.paddr = buf_node->paddr;
+		param.len = buf_node->buf.data_len;
+	}
 	param.msw_ts = buf_node->meta_info.meta_in.ntimestamp.highpart;
 	param.lsw_ts = buf_node->meta_info.meta_in.ntimestamp.lowpart;
 	/* If no meta_info enaled, indicate no time stamp valid */
@@ -1284,9 +1291,12 @@ long audio_aio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_lock(&audio->lock);
 		if (arg == 1) {
 			rc = audio_aio_pause(audio);
-			if (rc < 0)
+			if (rc < 0) {
 				pr_err("%s[%p]: pause FAILED rc=%d\n",
 					__func__, audio, rc);
+				mutex_unlock(&audio->lock);
+				break;
+			}
 			audio->drv_status |= ADRV_STATUS_PAUSE;
 		} else if (arg == 0) {
 			if (audio->drv_status & ADRV_STATUS_PAUSE) {

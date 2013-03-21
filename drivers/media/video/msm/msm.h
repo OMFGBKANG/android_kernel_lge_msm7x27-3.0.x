@@ -119,6 +119,7 @@ enum msm_camera_v4l2_subdev_notify {
 	NOTIFY_VFE_MSG_STATS,  /* arg = struct isp_msg_stats */
 	NOTIFY_VFE_MSG_COMP_STATS, /* arg = struct msm_stats_buf */
 	NOTIFY_VFE_BUF_EVT, /* arg = struct msm_vfe_resp */
+	NOTIFY_VFE_CAMIF_ERROR,
 	NOTIFY_ISPIF_STREAM, /* arg = enable parameter for s_stream */
 	NOTIFY_VPE_MSG_EVT,
 	NOTIFY_PCLK_CHANGE, /* arg = pclk */
@@ -298,6 +299,7 @@ struct msm_cam_v4l2_dev_inst {
 	int is_mem_map_inst;
 	struct img_plane_info plane_info;
 	int vbqueue_initialized;
+	struct mutex inst_lock;
 };
 
 struct msm_cam_mctl_node {
@@ -410,6 +412,7 @@ struct msm_cam_server_dev {
 	/* info of MCTL nodes successfully probed*/
 	struct msm_mctl_node_info mctl_node_info;
 	struct mutex server_lock;
+	uint32_t server_evt_id;
 };
 
 /* camera server related functions */
